@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishGuard AI | Malicious URL Detector</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --primary: #3b82f6;
+            --safe: #10b981;
+            --danger: #ef4444;
+            --warn: #f59e0b;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: var(--card);
+            padding: 2.5rem;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+        h1 { margin-top: 0; font-size: 1.8rem; text-align: center; }
+        p.subtitle { color: var(--muted); text-align: center; margin-bottom: 2rem; }
+        .input-group { display: flex; flex-direction: column; gap: 1rem; }
+        input, select, button {
+            padding: 0.9rem 1rem;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            font-size: 1rem;
+        }
+        input, select {
+            background: #0f172a;
+            color: var(--text);
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .result-box {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            border-radius: 10px;
+            background: #0f172a;
+            display: none;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.4rem 0.9rem;
+            border-radius: 999px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+        .benign { background: rgba(16, 185, 129, 0.2); color: var(--safe); }
+        .phishing, .malware { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .defacement { background: rgba(245, 158, 11, 0.2); color: var(--warn); }
+        .bar-container { margin-top: 1rem; }
+        .bar-row { margin-bottom: 0.6rem; }
+        .bar-label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+        .bar-bg { background: #334155; height: 8px; border-radius: 4px; overflow: hidden; }
+        .bar-fill { height: 100%; background: var(--primary); transition: width 0.4s ease; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🛡️ PhishGuard AI</h1>
+    <p class="subtitle">Analyze URLs for Phishing, Malware, and Defacement</p>
+
+    <div class="input-group">
+        <input type="text" id="urlInput" placeholder="Enter URL (e.g., http://secure-login-verify.com/account)" />
+        <select id="modelSelect">
+            <option value="best">Best Model (Auto-Selected)</option>
+            <option value="logistic_regression">Logistic Regression</option>
+            <option value="xgboost">XGBoost Classifier</option>
+            <option value="random_forest">Random Forest</option>
+        </select>
+        <button id="scanBtn" onclick="analyzeURL()">Scan URL</button>
+    </div>
+
+    <div class="result-box" id="resultBox">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Classification Result:</span>
+            <span id="predictionBadge" class="badge"></span>
+        </div>
+        <div class="bar-container" id="confidenceBars"></div>
+    </div>
+</div>
+
+<script>
+    async function analyzeURL() {
+        const urlInput = document.getElementById("urlInput");
+        const url = urlInput.value.trim();
+        const model_name = document.getElementById("modelSelect").value;
+        const scanBtn = document.getElementById("scanBtn");
+        const resultBox = document.getElementById("resultBox");
+
+        if (!url) return alert("Please enter a URL first!");
+
+        scanBtn.disabled = true;
+        scanBtn.textContent = "Scanning...";
+
+        try {
+            const response = await fetch("/predict", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url, model_name })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                alert(data.detail || "Error predicting URL");
+                return;
+            }
+
+            const badge = document.getElementById("predictionBadge");
+            const bars = document.getElementById("confidenceBars");
+
+            resultBox.style.display = "block";
+            badge.textContent = data.prediction;
+            badge.className = "badge " + data.prediction.toLowerCase();
+
+            bars.innerHTML = "";
+            for (const [label, score] of Object.entries(data.confidence)) {
+                bars.innerHTML += `
+                    <div class="bar-row">
+                        <div class="bar-label">
+                            <span>${label.toUpperCase()}</span>
+                            <span>${score}%</span>
+                        </div>
+                        <div class="bar-bg">
+                            <div class="bar-fill" style="width: ${score}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+        } catch (err) {
+            alert("Network error or server unavailable: " + err.message);
+        } finally {
+            scanBtn.disabled = false;
+            scanBtn.textContent = "Scan URL";
+        }
+    }
+</script>
+
+</body>
+</html>
